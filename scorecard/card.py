@@ -1,5 +1,9 @@
+import re
+
 import numpy as np
 import pandas as pd
+import pyperclip
+from jinja2 import Environment
 
 
 def _ab(points0, odds0, pdo):
@@ -47,3 +51,46 @@ def scorecard(bins, intercept, coef, feature_names, points0=600, odds0=1/19, pdo
         pd.DataFrame({'variable': 'Base Line', 'bin': None, 'score': np.round(a - b * intercept)}),
         dt[['variable', 'bin', 'score']]
     ], axis=0, ignore_index=True)
+
+
+def to_sql(card, to_clipboard=True):
+
+    def parse(dt):
+        def search(value):
+            return re.search(r'\bnan\b', value)
+
+        def sub(value):
+            return re.sub(r'( ,)?nan(, )?', '', value)
+
+        env = Environment(autoescape=False, trim_blocks=True, lstrip_blocks=True)
+        env.filters['search'] = search
+        env.filters['sub'] = sub
+        templ = """
+        case
+            {% for row in dt.itertuples() %}
+                {% if row.bin.startswith('[') %}
+                    {% if row.bin.endswith('inf)') %}
+                        else {{ row.score }}
+                    {% else %}
+                        when {{ row.variable }} < {{ row.bin.strip(')').split(',')[1] }} then {{ row.score }}
+                    {% endif %}
+                {% else %}
+                    {% if row.bin | search %}
+                        when {{ row.variable }} is null or {{ row.variable }} in {{ row.bin | sub | replace(',)', ')') }} then {{ row.score }}
+                    {% else %}
+                        when {{ row.variable }} in {{ row.bin | replace(',)', ')') }} then {{ row.score }}
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
+        end
+        """
+        return env.from_string(templ).render(dt=dt)
+
+    variables = card.iloc[1:, 0].unique()
+    result = [str(card.iloc[0, 2])]
+    for variable in variables:
+        result.append(parse(card.loc[card['variable'] == variable, :]))
+    result = ' + '.join(result)
+    if to_clipboard:
+        pyperclip.copy(result)
+    return result
