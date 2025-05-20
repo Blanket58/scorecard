@@ -3,3 +3,5 @@ scikit-learn~=1.6.1
 numpy~=2.2.5
 matplotlib~=3.10.1
 lightgbm~=4.6.0
+Jinja2~=3.1.6
+pyperclip~=1.9.0
