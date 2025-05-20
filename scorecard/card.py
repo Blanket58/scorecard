@@ -82,21 +82,24 @@ def card2sql(card, to_clipboard=True):
         env.filters['sub'] = sub
         templ = """
         case
-        {% for row in dt.itertuples() -%}
-        {%- if row.bin.startswith('[') -%}
+        {% for row in dt.itertuples() %}
+        {% if row.bin.startswith('[') %}
         {% if row.bin.endswith('inf)') %}
             else {{ row.score }}
         {% else %}
             when {{ row.variable }} < {{ row.bin.strip(')').split(',')[1] }} then {{ row.score }}
         {% endif %}
-        {%- else -%}
+        {% else %}
         {% if row.bin | search %}
             when {{ row.variable }} is null or {{ row.variable }} in {{ row.bin | sub | replace(',)', ')') }} then {{ row.score }}
         {% else %}
             when {{ row.variable }} in {{ row.bin | replace(',)', ')') }} then {{ row.score }}
         {% endif %}
-        {%- endif -%}
-        {%- endfor %}
+        {% endif %}
+        {% endfor %}
+        {% if dt.iloc[-1, 1].startswith('(') %}
+            else {{ dt.iloc[-1, 2] }}
+        {% endif %}
         end
         """
         return env.from_string(templ).render(dt=dt)
