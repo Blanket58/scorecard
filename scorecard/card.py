@@ -53,7 +53,22 @@ def scorecard(bins, intercept, coef, feature_names, points0=600, odds0=1/19, pdo
     ], axis=0, ignore_index=True)
 
 
-def to_sql(card, to_clipboard=True):
+def card2sql(card, to_clipboard=True):
+    """
+    将scorecard()输出的评分卡结果转为case when SQL
+
+    Parameters
+    ----------
+    card : DataFrame
+        scorecard()输出的评分卡结果（不可做任何修改）
+    to_clipboard: bool
+        是否同时复制到剪切板
+
+    Returns
+    -------
+    str
+        计算评分卡总分的SQL
+    """
 
     def parse(dt):
         def search(value):
@@ -67,25 +82,26 @@ def to_sql(card, to_clipboard=True):
         env.filters['sub'] = sub
         templ = """
         case
-            {% for row in dt.itertuples() %}
-                {% if row.bin.startswith('[') %}
-                    {% if row.bin.endswith('inf)') %}
-                        else {{ row.score }}
-                    {% else %}
-                        when {{ row.variable }} < {{ row.bin.strip(')').split(',')[1] }} then {{ row.score }}
-                    {% endif %}
-                {% else %}
-                    {% if row.bin | search %}
-                        when {{ row.variable }} is null or {{ row.variable }} in {{ row.bin | sub | replace(',)', ')') }} then {{ row.score }}
-                    {% else %}
-                        when {{ row.variable }} in {{ row.bin | replace(',)', ')') }} then {{ row.score }}
-                    {% endif %}
-                {% endif %}
-            {% endfor %}
+        {% for row in dt.itertuples() -%}
+        {%- if row.bin.startswith('[') -%}
+        {% if row.bin.endswith('inf)') %}
+            else {{ row.score }}
+        {% else %}
+            when {{ row.variable }} < {{ row.bin.strip(')').split(',')[1] }} then {{ row.score }}
+        {% endif %}
+        {%- else -%}
+        {% if row.bin | search %}
+            when {{ row.variable }} is null or {{ row.variable }} in {{ row.bin | sub | replace(',)', ')') }} then {{ row.score }}
+        {% else %}
+            when {{ row.variable }} in {{ row.bin | replace(',)', ')') }} then {{ row.score }}
+        {% endif %}
+        {%- endif -%}
+        {%- endfor %}
         end
         """
         return env.from_string(templ).render(dt=dt)
 
+    card['bin'] = card['bin'].astype(str)
     variables = card.iloc[1:, 0].unique()
     result = [str(card.iloc[0, 2])]
     for variable in variables:
