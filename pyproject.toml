@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0.0", "wheel"]
+requires = ["setuptools>=77.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Rewrite brand new robust scorecard toolbox, if you are looking for something similar as `scorecard` in R and `scorecardpy` in python."
 readme = "README.md"
-license = { text = "GPL-3.0-only" }
+license = "GPL-3.0-only"
 requires-python = ">=3.10, <=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
