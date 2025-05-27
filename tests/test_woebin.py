@@ -1,5 +1,7 @@
-import pandas as pd
+from hashlib import md5
+
 import numpy as np
+import pandas as pd
 
 from scorecard.woebin import DecisionTree
 
