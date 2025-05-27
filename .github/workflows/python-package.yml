@@ -50,6 +50,7 @@ jobs:
         for WHL in dist/*.whl; do
           NEW_NAME=$(basename "$WHL" | sed "s/-py3-/-${PY_TAG}-/")
           mv "$WHL" "dist/packages/${NEW_NAME}"
+        done
     - name: Clean up
       run: |
         rm -rf build
