@@ -60,3 +60,11 @@ jobs:
       with:
         name: python-packages-${{ matrix.python-version }}
         path: dist/packages/
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        files: dist/pacakges/*.whl
+        tag_name: 0.0.1
+        body: "Release 0.0.1"
