@@ -27,7 +27,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
+        python -m pip install flake8 pytest setuptools wheel build
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Lint with flake8
       run: |
@@ -40,3 +40,18 @@ jobs:
         PYTHONPATH: ${{ github.workspace }}
       run: |
         pytest tests/
+    - name: Build wheel
+      run: |
+        python -m build --wheel --sdist
+        mkdir -p dist/packages
+        mv dist/*.whl dist/packages/
+        mv dist/*.tar.gz dist/packages/
+    - name: Clean up
+      run: |
+        rm -rf build
+        rm -rf *.egg-info
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-packages
+        path: dist/packages/
