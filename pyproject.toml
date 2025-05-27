@@ -14,7 +14,6 @@ license = { text = "GPL-3.0-only" }
 requires-python = ">=3.10, <=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering :: Mathematics",
     "Intended Audience :: Financial and Insurance Industry"
