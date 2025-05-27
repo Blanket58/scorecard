@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scorecard"
+version = "0.1.0"
+authors = [
+    { name = "BI/GANG", email = "grants.tougher.0t@icloud.com" }
+]
+description = "Rewrite brand new robust scorecard toolbox, if you are looking for something similar as `scorecard` in R and `scorecardpy` in python."
+readme = "README.md"
+license = { text = "GNU General Public License v3.0" }
+requires-python = ">=3.10, <=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Intended Audience :: Financial and Insurance Industry"
+]
+dependencies = [
+  "pandas >=2.0.0",
+  "scikit-learn >=1.6.0",
+  "numpy >=2.0.0",
+  "matplotlib >=3.10.0",
+  "lightgbm >=4.6.0",
+  "Jinja2 >=3.1.6",
+  "pyperclip >=1.9.0"
+]
+
+[project.urls]
+Homepage = "https://blanket58.github.io/2021/12/scorecard/"
