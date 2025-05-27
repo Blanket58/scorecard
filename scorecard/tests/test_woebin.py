@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from scorecard.woebin import DecisionTree
+from ..woebin import DecisionTree
 
 
 class TestWoebin:
