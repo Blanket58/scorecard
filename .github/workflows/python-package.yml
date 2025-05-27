@@ -44,8 +44,12 @@ jobs:
       run: |
         python -m build --wheel --sdist
         mkdir -p dist/packages
-        mv dist/*.whl dist/packages/
-        mv dist/*.tar.gz dist/packages/
+    - name: Rename wheel with python versions
+      run: |
+        PY_TAG="py${{ matrix.python-version }}"
+        for WHL in dist/*.whl; do
+          NEW_NAME=$(basename "$WHL" | sed "s/-py3-/-${PY_TAG}-/")
+          mv "$WHL" "dist/packages/${NEW_NAME}"
     - name: Clean up
       run: |
         rm -rf build
@@ -53,5 +57,5 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: python-packages
+        name: python-packages-${{ matrix.python-version }}
         path: dist/packages/
