@@ -32,6 +32,7 @@ class WOEBaseEstimator(ABC):
 
     @staticmethod
     def _transform_category(X, y, boundary):
+        y.rename('y', inplace=True)
         dt = pd.concat([X, y], axis=1)
         mapping = {category: group for group in boundary for category in group}
         dt['bin'] = dt.iloc[:, 0].map(mapping)
@@ -62,6 +63,7 @@ class WOEBaseEstimator(ABC):
 
     @staticmethod
     def _transform_numeric(X, y, boundary):
+        y.rename('y', inplace=True)
         dt = pd.concat([X, y], axis=1)
         dt['bin'] = pd.cut(X, bins=boundary, right=False)
         dt = dt.groupby('bin', observed=True, dropna=False).agg(
