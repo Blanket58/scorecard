@@ -66,6 +66,8 @@ bins = dict(filter(lambda x: x[0] in variables, bins.items()))
 woebin_plot(bins)
 ```
 
+![Figure_1](https://github.com/user-attachments/assets/4b456537-3fca-4a3b-bd79-3b427b9a6b70)
+
 ```python
 X_train_woe = woebin_ply(X_train[variables], bins)
 X_test_woe = woebin_ply(X_test[variables], bins)
@@ -107,6 +109,9 @@ perf_eva(y_train, y_train_pred, 'Train')
 perf_eva(y_test, y_test_pred, 'Test')
 ```
 
+![Figure_2](https://github.com/user-attachments/assets/696907b0-ea07-40a0-8c85-6045c783d39a)
+![Figure_3](https://github.com/user-attachments/assets/263bc8bc-03a6-4e9e-a563-ea100055d386)
+
 ```python
 total_bad_rate = y_train.sum() / y_train.size
 odds0 = total_bad_rate / (1 - total_bad_rate)
@@ -138,6 +143,8 @@ perf_psi(
     score={'train': y_train_score, 'test': y_test_score}
 )
 ```
+
+![Figure_4](https://github.com/user-attachments/assets/10704262-a693-48aa-8563-79e28cbba903)
 
 ```python
 card = scorecard(
