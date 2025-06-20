@@ -6,6 +6,12 @@ Rewrite brand new robust scorecard toolbox, if you are looking for something sim
 
 ## User Guide
 
+Download from releases and install it.
+
+```bash
+pip install scorecard-0.0.1-py3-none-any.whl
+```
+
 Using germancredit dataset as example.
 
 ```python
