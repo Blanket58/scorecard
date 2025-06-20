@@ -139,3 +139,19 @@ perf_psi(
 )
 ```
 
+```python
+card = scorecard(
+    bins,
+    clf.intercept_,
+    clf.coef_.reshape(-1,),
+    variables,
+    points0=600,
+    odds0=odds0,
+    pdo=50
+)
+card
+```
+
+```python
+print(card2sql(card))
+```
