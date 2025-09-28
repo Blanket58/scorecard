@@ -9,7 +9,7 @@ from sklearn.preprocessing import OrdinalEncoder
 from sklearn.tree import DecisionTreeClassifier
 
 
-class WOEBaseEstimator(ABC):
+class EnumMixin:
 
     @staticmethod
     def _fit_enum(X, y, *args, **kwargs):
@@ -24,6 +24,9 @@ class WOEBaseEstimator(ABC):
     def enum(cls, X, y, *args, **kwargs):
         boundary = cls._fit_enum(X, y, *args, **kwargs)
         return cls._transform_enum(X, y, boundary)
+
+
+class CategoryMixin(ABC):
 
     @staticmethod
     @abstractmethod
@@ -56,6 +59,9 @@ class WOEBaseEstimator(ABC):
         boundary = cls._fit_category(X, y, *args, **kwargs)
         return cls._transform_category(X, y, boundary)
 
+
+class NumericMixin(ABC):
+
     @staticmethod
     @abstractmethod
     def _fit_numeric(X, y, *args, **kwargs):
@@ -86,7 +92,7 @@ class WOEBaseEstimator(ABC):
         return cls._transform_numeric(X, y, boundary)
 
 
-class DecisionTree(WOEBaseEstimator):
+class DecisionTree(EnumMixin, CategoryMixin, NumericMixin):
 
     @staticmethod
     def _fit_category(X, y, *args, **kwargs):
