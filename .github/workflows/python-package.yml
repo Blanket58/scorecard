@@ -6,12 +6,10 @@ on:
       release_tag_name:
         description: "版本号"
         required: true
-        default: false
         type: string
       release_body:
         description: "版本描述"
         required: true
-        default: false
         type: string
 
 jobs:
