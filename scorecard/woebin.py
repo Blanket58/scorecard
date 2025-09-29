@@ -18,23 +18,6 @@ class EnumMixin:
 
     @classmethod
     def _transform_enum(cls, X, y, boundary):
-        return cls._transform_category(X, y, boundary)
-
-    @classmethod
-    def enum(cls, X, y, *args, **kwargs):
-        boundary = cls._fit_enum(X, y, *args, **kwargs)
-        return cls._transform_enum(X, y, boundary)
-
-
-class CategoryMixin(ABC):
-
-    @staticmethod
-    @abstractmethod
-    def _fit_category(X, y, *args, **kwargs):
-        pass
-
-    @staticmethod
-    def _transform_category(X, y, boundary):
         y.rename('y', inplace=True)
         dt = pd.concat([X, y], axis=1)
         mapping = {category: group for group in boundary for category in group}
@@ -53,6 +36,23 @@ class CategoryMixin(ABC):
         dt = dt[['variable', 'bin', 'count', 'count_distr', 'neg', 'pos', 'posprob', 'woe', 'bin_iv', 'total_iv']]
         dt.sort_values(by='posprob', ascending=True, ignore_index=True, inplace=True)
         return dt
+
+    @classmethod
+    def enum(cls, X, y, *args, **kwargs):
+        boundary = cls._fit_enum(X, y, *args, **kwargs)
+        return cls._transform_enum(X, y, boundary)
+
+
+class CategoryMixin(ABC, EnumMixin):
+
+    @staticmethod
+    @abstractmethod
+    def _fit_category(X, y, *args, **kwargs):
+        pass
+
+    @staticmethod
+    def _transform_category(X, y, boundary):
+        return cls._transform_enum(X, y, boundary)
 
     @classmethod
     def category(cls, X, y, *args, **kwargs):
@@ -92,7 +92,7 @@ class NumericMixin(ABC):
         return cls._transform_numeric(X, y, boundary)
 
 
-class DecisionTree(EnumMixin, CategoryMixin, NumericMixin):
+class DecisionTree(CategoryMixin, NumericMixin):
 
     @staticmethod
     def _fit_category(X, y, *args, **kwargs):
