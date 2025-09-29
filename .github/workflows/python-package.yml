@@ -72,5 +72,5 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: dist/*.whl
-        tag_name: ${{ github.events.inputs.release_tag_name }}
-        body: ${{ github.events.inputs.release_body }}
+        tag_name: ${{ inputs.release_tag_name }}
+        body: ${{ inputs.release_body }}
