@@ -10,8 +10,8 @@ on:
         type: string
       release_body:
         description: "版本描述"
-        required: false
-        default: "Release ${{ github.events.inputs.release_tag_name }}"
+        required: true
+        default: false
         type: string
 
 jobs:
