@@ -16,8 +16,8 @@ class EnumMixin:
         boundary = [tuple(x) for x in X.unique().reshape(-1, 1).tolist()]
         return boundary
 
-    @classmethod
-    def _transform_enum(cls, X, y, boundary):
+    @staticmethod
+    def _transform_enum(X, y, boundary):
         y.rename('y', inplace=True)
         dt = pd.concat([X, y], axis=1)
         mapping = {category: group for group in boundary for category in group}
@@ -50,8 +50,8 @@ class CategoryMixin(ABC, EnumMixin):
     def _fit_category(X, y, *args, **kwargs):
         pass
 
-    @staticmethod
-    def _transform_category(X, y, boundary):
+    @classmethod
+    def _transform_category(cls, X, y, boundary):
         return cls._transform_enum(X, y, boundary)
 
     @classmethod
