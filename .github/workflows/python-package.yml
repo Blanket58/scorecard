@@ -1,10 +1,18 @@
 name: Python package
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      release_tag_name:
+        description: "版本号"
+        required: true
+        default: false
+        type: string
+      release_body:
+        description: "版本描述"
+        required: false
+        default: "Release ${{ github.events.inputs.release_tag_name }}"
+        type: string
 
 jobs:
   test:
@@ -66,5 +74,5 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         files: dist/*.whl
-        tag_name: 0.0.1
-        body: "Release 0.0.1"
+        tag_name: ${{ github.events.inputs.release_tag_name }}
+        body: ${{ github.events.inputs.release_body }}
