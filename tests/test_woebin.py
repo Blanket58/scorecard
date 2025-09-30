@@ -3,7 +3,7 @@ from hashlib import md5
 import numpy as np
 import pandas as pd
 
-from ..woebin import DecisionTree, ChiMerge
+from scorecard.woebin import DecisionTree, ChiMerge
 
 
 class TestWoebin:
