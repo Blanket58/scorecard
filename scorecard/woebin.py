@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 from lightgbm import LGBMClassifier
 from matplotlib import pyplot as plt
+from numba import njit
+from scipy.stats import chi2
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.tree import DecisionTreeClassifier
 
@@ -12,7 +14,7 @@ from sklearn.tree import DecisionTreeClassifier
 class EnumMixin:
 
     @staticmethod
-    def _fit_enum(X, y, *args, **kwargs):
+    def _fit_enum(X, y):
         boundary = [tuple(x) for x in X.unique().reshape(-1, 1).tolist()]
         return boundary
 
@@ -38,8 +40,8 @@ class EnumMixin:
         return dt
 
     @classmethod
-    def enum(cls, X, y, *args, **kwargs):
-        boundary = cls._fit_enum(X, y, *args, **kwargs)
+    def enum(cls, X, y, **kwargs):
+        boundary = cls._fit_enum(X, y)
         return cls._transform_enum(X, y, boundary)
 
 
@@ -47,7 +49,7 @@ class CategoryMixin(ABC, EnumMixin):
 
     @staticmethod
     @abstractmethod
-    def _fit_category(X, y, *args, **kwargs):
+    def _fit_category(X, y, **kwargs):
         pass
 
     @classmethod
@@ -55,8 +57,8 @@ class CategoryMixin(ABC, EnumMixin):
         return cls._transform_enum(X, y, boundary)
 
     @classmethod
-    def category(cls, X, y, *args, **kwargs):
-        boundary = cls._fit_category(X, y, *args, **kwargs)
+    def category(cls, X, y, **kwargs):
+        boundary = cls._fit_category(X, y, **kwargs)
         return cls._transform_category(X, y, boundary)
 
 
@@ -64,7 +66,7 @@ class NumericMixin(ABC):
 
     @staticmethod
     @abstractmethod
-    def _fit_numeric(X, y, *args, **kwargs):
+    def _fit_numeric(X, y, **kwargs):
         pass
 
     @staticmethod
@@ -87,15 +89,15 @@ class NumericMixin(ABC):
         return dt
 
     @classmethod
-    def numeric(cls, X, y, *args, **kwargs):
-        boundary = cls._fit_numeric(X, y, *args, **kwargs)
+    def numeric(cls, X, y, **kwargs):
+        boundary = cls._fit_numeric(X, y, **kwargs)
         return cls._transform_numeric(X, y, boundary)
 
 
 class DecisionTree(CategoryMixin, NumericMixin):
 
     @staticmethod
-    def _fit_category(X, y, *args, **kwargs):
+    def _fit_category(X, y, **kwargs):
         def get_parent(node_index):
             parent_index = dt.loc[dt.node_index == node_index, 'parent_index'].values[0]
             add = []
@@ -125,7 +127,7 @@ class DecisionTree(CategoryMixin, NumericMixin):
         encoded_X = encoder.fit_transform(X.to_frame())
         clf = LGBMClassifier(
             objective='binary',
-            num_leaves=8,
+            num_leaves=kwargs.get('bins_num'),
             learning_rate=1,
             n_estimators=1,
             min_child_samples=int(X.shape[0] * 0.05),
@@ -139,11 +141,11 @@ class DecisionTree(CategoryMixin, NumericMixin):
         return boundary
 
     @staticmethod
-    def _fit_numeric(X, y, *args, **kwargs):
+    def _fit_numeric(X, y, **kwargs):
         clf = DecisionTreeClassifier(
             criterion='entropy',
             splitter='best',
-            max_leaf_nodes=8,
+            max_leaf_nodes=kwargs.get('bins_num'),
             min_samples_leaf=0.05,
             random_state=1
         )
@@ -160,6 +162,87 @@ class DecisionTree(CategoryMixin, NumericMixin):
         return boundary
 
 
+class ChiMerge(CategoryMixin, NumericMixin):
+
+    @njit
+    def _calculate_chi2(window):
+        """计算卡方值"""
+        row_totals = window.sum(axis=1)  # 每行的总和（长度2）
+        col_totals = window.sum(axis=0)  # 每列的总和（长度n_cols）
+        grand_total = row_totals.sum()  # 总总和
+        # 计算期望频数：E = (行总和 × 列总和) / 总总和
+        expected = np.outer(row_totals, col_totals) / grand_total
+        # 处理可能的除以零（若期望值为0，该 term 贡献0）
+        expected = np.where(expected == 0, 1e-10, expected)
+        # 计算卡方值：Σ[(观察值-期望值)² / 期望值]
+        chi2 = np.sum((window - expected) ** 2 / expected)
+        return chi2
+
+    @staticmethod
+    def _fit_category(X, y, **kwargs):
+        bins_num = kwargs.get('bins_num')
+        dt = pd.crosstab(X, y).reset_index(names='var')
+        while True:
+            dt['chi2'] = dt.iloc[:, 1:3].rolling(window=2, method='table').apply(
+                _calculate_chi2,
+                raw=True,
+                engine='numba'
+            ).iloc[:, 0]
+            min_idx = dt['chi2'].idxmin(skipna=True)
+            min_val = dt.iloc[min_idx, 3]
+            threshold = chi2.ppf(q=0.95, df=dt.shape[0]-1)
+            if min_val < threshold and dt.shape[0] > bins_num:
+                old_rows = dt.iloc[min_idx-1:min_idx+1, :]
+                new_row = pd.concat([
+                    pd.DataFrame({'var': '%,%'.join(old_rows['var'])}, index=[0]),
+                    pd.DataFrame([old_rows.iloc[:, 1:].sum(axis=0)])
+                ], axis=1)
+                dt = pd.concat([
+                    dt.iloc[:min_idx-1],
+                    new_row,
+                    dt.iloc[min_idx+1:]
+                ], axis=0).reset_index(drop=True)
+            else:
+                break
+        boundary = dt['var'].map(lambda x: tuple(x.split('%,%'))).tolist()
+        return boundary
+
+    @staticmethod
+    def _fit_numeric(X, y, **kwargs):
+        bins_num = kwargs.get('bins_num')
+        X_tf = pd.qcut(X, q=50, precision=3, duplicates='drop').astype('interval')
+        dt = pd.crosstab(X_tf, y).reset_index(names='var')
+        while True:
+            dt['chi2'] = dt.iloc[:, 1:3].rolling(window=2, method='table').apply(
+                _calculate_chi2,
+                raw=True,
+                engine='numba'
+            ).iloc[:, 0]
+            min_idx = dt['chi2'].idxmin(skipna=True)
+            min_val = dt.iloc[min_idx, 3]
+            threshold = chi2.ppf(q=0.95, df=dt.shape[0]-1)
+            if min_val < threshold and dt.shape[0] > bins_num:
+                old_rows = dt.iloc[min_idx-1:min_idx+1, :]
+                new_row = pd.concat([
+                    pd.DataFrame({
+                        'var': pd.Interval(
+                            left=old_rows['var'].map(lambda x: x.left).min(),
+                            right=old_rows['var'].map(lambda x: x.right).max()
+                        )
+                    }, index=[0]),
+                    pd.DataFrame([old_rows.iloc[:, 1:].sum(axis=0)])
+                ], axis=1)
+                dt = pd.concat([
+                    dt.iloc[:min_idx-1],
+                    new_row,
+                    dt.iloc[min_idx+1:]
+                ], axis=0).reset_index(drop=True)
+            else:
+                break
+        boundary = sorted(dt['var'].map(lambda x: x.right).tolist()[:-1] + [-np.inf, np.inf])
+        return boundary
+
+
 def _assert_type(X):
     if X.dropna().unique().size <= 3:
         return 'ENUM'
@@ -171,7 +254,7 @@ def _assert_type(X):
         raise NotImplementedError('Not implemented data type.')
 
 
-def woebin(dt, y, method='tree'):
+def woebin(dt, y, method='tree', bins_num=8):
     """
     Automatically finds the best woe cut points for each varibale in specific data set.
 
@@ -192,25 +275,24 @@ def woebin(dt, y, method='tree'):
     match method:
         case 'tree':
             estimator = DecisionTree
-        # case 'chimerge':
-        #     pass
+        case 'chimerge':
+            estimator = ChiMerge
         # case 'best_ks':
         #     pass
         case _:
             raise NotImplementedError('Not implemented method.')
-
     result = []
     for _, X in dt.items():
         match _assert_type(X):
             case 'ENUM':
-                data = estimator.enum(X, y)
+                handler = estimator.enum
             case 'CATEGORY':
-                data = estimator.category(X, y)
+                handler = estimator.category
             case 'NUMERIC':
-                data = estimator.numeric(X, y)
+                handler = estimator.numeric
             case _:
                 raise NotImplementedError('Not implemented data type.')
-        result.append(data)
+        result.append(handler(X, y, bins_num=bins_num))
     return dict(zip(dt.columns, result))
 
 
