@@ -164,6 +164,7 @@ class DecisionTree(CategoryMixin, NumericMixin):
 
 class ChiMerge(CategoryMixin, NumericMixin):
 
+    @staticmethod
     @njit
     def _calculate_chi2(window):
         """计算卡方值"""
@@ -175,16 +176,16 @@ class ChiMerge(CategoryMixin, NumericMixin):
         # 处理可能的除以零（若期望值为0，该 term 贡献0）
         expected = np.where(expected == 0, 1e-10, expected)
         # 计算卡方值：Σ[(观察值-期望值)² / 期望值]
-        chi2 = np.sum((window - expected) ** 2 / expected)
-        return chi2
+        result = np.sum((window - expected) ** 2 / expected)
+        return result
 
-    @staticmethod
-    def _fit_category(X, y, **kwargs):
+    @classmethod
+    def _fit_category(cls, X, y, **kwargs):
         bins_num = kwargs.get('bins_num')
         dt = pd.crosstab(X, y).reset_index(names='var')
         while True:
             dt['chi2'] = dt.iloc[:, 1:3].rolling(window=2, method='table').apply(
-                _calculate_chi2,
+                cls._calculate_chi2,
                 raw=True,
                 engine='numba'
             ).iloc[:, 0]
@@ -207,14 +208,14 @@ class ChiMerge(CategoryMixin, NumericMixin):
         boundary = dt['var'].map(lambda x: tuple(x.split('%,%'))).tolist()
         return boundary
 
-    @staticmethod
-    def _fit_numeric(X, y, **kwargs):
+    @classmethod
+    def _fit_numeric(cls, X, y, **kwargs):
         bins_num = kwargs.get('bins_num')
         X_tf = pd.qcut(X, q=50, precision=3, duplicates='drop').astype('interval')
         dt = pd.crosstab(X_tf, y).reset_index(names='var')
         while True:
             dt['chi2'] = dt.iloc[:, 1:3].rolling(window=2, method='table').apply(
-                _calculate_chi2,
+                cls._calculate_chi2,
                 raw=True,
                 engine='numba'
             ).iloc[:, 0]
@@ -266,6 +267,8 @@ def woebin(dt, y, method='tree', bins_num=8):
         Target value.
     method : str
         Method used to automatic cut bin. Can choose tree, chimerge, best_ks.
+    bins_num: int
+        Number of bins wants to cut.
 
     Returns
     -------
