@@ -12,12 +12,12 @@ def _ab(points0, odds0, pdo):
     return a, b
 
 
-def prob2score(y_proba, points0=600, odds0=1/19, pdo=50):
+def prob2score(y_proba, points0=600, odds0=1 / 19, pdo=50):
     a, b = _ab(points0, odds0, pdo)
     return np.round(a - b * np.log(y_proba / (1 - y_proba)))
 
 
-def scorecard(bins, intercept, coef, feature_names, points0=600, odds0=1/19, pdo=50):
+def scorecard(bins, intercept, coef, feature_names, points0=600, odds0=1 / 19, pdo=50):
     """
     对Dataframe按列分箱，输出分箱结果
 
@@ -45,12 +45,22 @@ def scorecard(bins, intercept, coef, feature_names, points0=600, odds0=1/19, pdo
     """
     a, b = _ab(points0, odds0, pdo)
     dt = pd.concat(bins, axis=0, ignore_index=True)
-    dt['coef'] = dt['variable'].map({x: y for x, y in zip(feature_names, coef)})
-    dt['score'] = - np.round(b * dt['coef'] * dt['woe'])
-    return pd.concat([
-        pd.DataFrame({'variable': 'Base Line', 'bin': None, 'score': np.round(a - b * intercept)}),
-        dt[['variable', 'bin', 'score']]
-    ], axis=0, ignore_index=True)
+    dt["coef"] = dt["variable"].map({x: y for x, y in zip(feature_names, coef)})
+    dt["score"] = -np.round(b * dt["coef"] * dt["woe"])
+    return pd.concat(
+        [
+            pd.DataFrame(
+                {
+                    "variable": "Base Line",
+                    "bin": None,
+                    "score": np.round(a - b * intercept),
+                }
+            ),
+            dt[["variable", "bin", "score"]],
+        ],
+        axis=0,
+        ignore_index=True,
+    )
 
 
 def card2sql(card, to_clipboard=True):
@@ -72,14 +82,14 @@ def card2sql(card, to_clipboard=True):
 
     def parse(dt):
         def search(value):
-            return re.search(r'\bnan\b', value)
+            return re.search(r"\bnan\b", value)
 
         def sub(value):
-            return re.sub(r'( ,)?nan(, )?', '', value)
+            return re.sub(r"( ,)?nan(, )?", "", value)
 
         env = Environment(autoescape=False, trim_blocks=True, lstrip_blocks=True)
-        env.filters['search'] = search
-        env.filters['sub'] = sub
+        env.filters["search"] = search
+        env.filters["sub"] = sub
         templ = """
         case
         {% for row in dt.itertuples() %}
@@ -104,12 +114,12 @@ def card2sql(card, to_clipboard=True):
         """
         return env.from_string(templ).render(dt=dt)
 
-    card['bin'] = card['bin'].astype(str)
+    card["bin"] = card["bin"].astype(str)
     variables = card.iloc[1:, 0].unique()
     result = [str(card.iloc[0, 2])]
     for variable in variables:
-        result.append(parse(card.loc[card['variable'] == variable, :]))
-    result = ' + '.join(result)
+        result.append(parse(card.loc[card["variable"] == variable, :]))
+    result = " + ".join(result)
     if to_clipboard:
         pyperclip.copy(result)
     return result
