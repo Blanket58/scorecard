@@ -32,6 +32,3 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://blanket58.github.io/2021/12/scorecard/"
-
-[tool.setuptools]
-version = "${PACKAGE_VERSION:-0.0.0}"
