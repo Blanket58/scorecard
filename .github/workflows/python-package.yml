@@ -117,11 +117,12 @@ jobs:
 
       - name: Inject package version
         env:
-          PACKAGE_VERSION: ${{ inputs.release_version }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
         run: |
-          sed -i.bak "s/^version = \".*\"/version = \"$PACKAGE_VERSION\"/g" pyproject.toml
-          rm -f pyproject.toml.bak  # 删除sed生成的备份文件
-          grep "version = " pyproject.toml
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git tag -a "v$RELEASE_VERSION" -m "Release v$RELEASE_VERSION"
+          git tag -l
 
       - name: Build wheels
         run: |
