@@ -21,7 +21,7 @@ class TestWoebin:
         y = pd.Series([0, 1, 1, 1], name='y')
         boundary = DecisionTreeWoeEncoder()._fit_category(X, y)
         assert boundary == [('first',), ('forth', 'second', 'third')]
-        boundary = ChiMergeWoeEncoder()._fit_category(X, y, bins_num=2)
+        boundary = ChiMergeWoeEncoder(bins_num=2)._fit_category(X, y)
         assert boundary == [('first',), ('forth', 'second', 'third')]
 
     def test_fit_numeric(self):
@@ -29,7 +29,7 @@ class TestWoebin:
         y = pd.Series([0, 1, 1, 1], name='y')
         boundary = DecisionTreeWoeEncoder()._fit_numeric(X, y)
         assert boundary == [-np.inf, 1.5, np.inf]
-        boundary = ChiMergeWoeEncoder()._fit_numeric(X, y, bins_num=2)
+        boundary = ChiMergeWoeEncoder(bins_num=2)._fit_numeric(X, y)
         assert boundary == [-np.inf, 1.06, np.inf]
 
     def test_fit_enum_with_missing(self):
