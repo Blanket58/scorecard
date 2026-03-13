@@ -1,9 +1,9 @@
-name: Python package
+name: Python Package Build & Release
 
 on:
   workflow_dispatch:
     inputs:
-      release_tag_name:
+      release_version:
         description: "版本号"
         required: true
         type: string
@@ -12,65 +12,192 @@ on:
         required: true
         type: string
 
-jobs:
-  test:
+env:
+  MIN_PYTHON_VERSION = "3.10"
+  TEST_PYTHON_VERSION = ["3.10", "3.11", "3.12", "3.13"]
+  PACKAGE_NAME = "scorecard"
 
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      
+      - name: Install lint dependencies
+        run: |
+          python -m pip install -- upgrade pip
+          pip install flake8 black isort pytest
+
+      - name: Lint with flake8 (语法/错误检查)
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Format check (black/isort)
+        run: |
+          black --check .
+          isort --check .
+
+  test:
+    needs: lint
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
-
+        python-version: ${{ env.TEST_PYTHON_VERSION }}
     steps:
     - uses: actions/checkout@v4
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         cache: "pip"
+        cache-dependency-path: "requirements.txt"
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    - name: Lint with flake8
-      run: |
-        pip install flake8
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
+        pip install -r requirements.txt pytest pytest-cov
+
+    - name: Run tests
       env:
         PYTHONPATH: ${{ github.workspace }}
+        PACKAGE_VERSION: ${{ inputs.release_version }}
       run: |
-        pip install pytest pytest-cov
-        pytest tests/ --doctest-modules --junitxml=junit/test-results-${{ matrix.python-version }}.xml --cov=com --cov-report=xml --cov-report=html
+        pytest tests/ \
+          --doctest-modules \
+          --junitxml=junit/test-results-${{ matrix.python-version }}.xml \
+          --cov=com \
+          --cov-report=xml \
+          --cov-report=html
+
     - name: Upload pytest results
       uses: actions/upload-artifact@v4
       with:
-        name: pytest-results-${{ matrix.python-version }}
-        path: junit/test-results-${{ matrix.python-version }}.xml
+        name: test-results-${{ matrix.python-version }}
+        path: test-results-${{ matrix.python-version }}.xml
       if: ${{ always() }}
 
   build:
-
-    runs-on: ubuntu-latest
     needs: test
-
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            cibw_platform: "linux_x86_64 linux_aarch64"
+          - os: macos-latest
+            cibw_platforms: "macosx_x86_64 macosx_arm64"
+          - os: windows-latest
+            cibw_platforms: "windows_x86_64 windows_arm64"
     steps:
     - uses: actions/checkout@v4
+      with:
+       fetch-depth: 0
+
+    - name: Set up Python
     - uses: actions/setup-python@v5
       with:
         python-version: "3.11"
-    - name: Build wheel
+        cache: "pip"
+
+    - name: Install build dependencies
       run: |
-        pip install setuptools wheel build
-        python -m build --wheel
-    - name: Create release
-      uses: softprops/action-gh-release@v1
+        python -m pip install --upgrade pip
+        pip install pip install setuptools wheel build twine cibuildwheel
+
+    - name: Inject package version
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PACKAGE_VERSION: ${{ inputs.release_version }}
+      run: |
+        echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
+
+    - name: Build cross-platform wheels
+      env:
+        CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-*"
+        CIBW_PLATFORMS: ${{ matrix.cibw_platforms }}
+        CIBW_SKIP: "cp313-*musllinux*"
+        CIBW_BEFORE_BUILD: "pip install -r requirements.txt"
+        CIBW_ENVIRONMENT: "PACKAGE_VERSION=${{ env.PACKAGE_VERSION }}"
+        CIBW_MANYLINUX_X86_64_IMAGE: "manylinux2014"
+        CIBW_TEST_COMMAND: "pytest {project}/tests/"
+      run: |
+        cibuildwheel --output-dir dist
+        ls -l dist/
+
+    - name: Validate build artifacts
+      run: |
+        twine check dist/*
+        if ! ls dist/ | grep "${{ env.PACKAGE_VERSION }}"; then
+          echo "Error: not find ${PACKAGE_VERSION}！"
+          ls -l dist/
+          exit 1
+        fi
+
+    - name: Upload platform-specific artifacts
+      uses: actions/upload-artifact@v4
       with:
-        files: dist/*.whl
-        tag_name: ${{ inputs.release_tag_name }}
-        body: ${{ inputs.release_body }}
+        name: wheels-${{ matrix.os }}
+        path: dist/*.whl
+
+    - name: Build source distribution (sdist)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        python -m build --sdist
+        twine check dist/*.tar.gz
+      env:
+        PACKAGE_VERSION: ${{ env.PACKAGE_VERSION }}
+
+    - name: Upload source distribution
+      if: matrix.os == 'ubuntu-latest'
+      uses: actions/upload-artifact@v4
+      with:
+        name: sdist
+        path: dist/*.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all platform wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist/wheels
+
+      - name: Download source distribution
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist/sdist
+
+      - name: Merge build artifacts
+        run: |
+          mkdir -p final_dist
+          cp dist/wheels/*.whl final_dist/
+          cp dist/sdist/*.tar.gz final_dist/
+          ls -l final_dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ inputs.release_version }}
+          body: ${{ inputs.release_description }}
+          files: final_dist/*
+          draft: false
+          prerelease: ${{ contains(inputs.release_version, 'beta') || contains(inputs.release_version, 'rc') }}
+          fail_on_unmatched_files: true
