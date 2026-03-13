@@ -1,8 +1,13 @@
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from sklearn.metrics import (auc, precision_recall_curve, precision_score,
-                             recall_score, roc_curve)
+from sklearn.metrics import (
+    auc,
+    precision_recall_curve,
+    precision_score,
+    recall_score,
+    roc_curve,
+)
 
 
 def perf_eva(y_true, y_proba, title=None):
