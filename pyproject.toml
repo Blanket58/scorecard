@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scorecard"
-version = "0.0.2"
+dynamic = ["version"]
 authors = [
     { name = "BI/GANG", email = "grants.tougher.0t@icloud.com" }
 ]
@@ -32,3 +32,6 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://blanket58.github.io/2021/12/scorecard/"
+
+[tool.setuptools]
+version = "${PACKAGE_VERSION:-0.0.0}"
