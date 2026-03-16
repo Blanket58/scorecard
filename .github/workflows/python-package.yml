@@ -1,43 +1,29 @@
 name: Python Package
 
 on:
-  workflow_dispatch:
-    inputs:
-      release_version:
-        description: "版本号"
-        required: true
-        type: string
-      release_description:
-        description: "版本描述"
-        required: true
-        type: string
-
-env:
-  MIN_PYTHON_VERSION: "3.10"
-  PACKAGE_NAME: "scorecard"
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  release:
+    types: [published]
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.10"
           cache: "pip"
-      
+
       - name: Install lint dependencies
         run: |
           python -m pip install --upgrade pip
           pip install flake8 black
 
-      - name: Lint with flake8 (语法/错误检查)
+      - name: Lint with flake8
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          flake8 . --count --show-source --statistics --max-line-length=127
 
       - name: Format check
         run: |
@@ -45,148 +31,72 @@ jobs:
 
   test:
     needs: lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix-os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
-          cache-dependency-path: "requirements.txt"
 
       - name: Install dependencies
         run: |
+          python --version
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest pytest-cov
 
       - name: Run tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-          PACKAGE_VERSION: ${{ inputs.release_version }}
         run: |
-          pytest tests/ \
-            --doctest-modules \
-            --junitxml=junit/test-results-${{ matrix.python-version }}.xml \
-            --cov=com \
-            --cov-report=xml \
-            --cov-report=html
+          pytest tests/ --cov=com --cov-report=xml --cov-report=term-missing
 
-      - name: Upload pytest results
-        uses: actions/upload-artifact@v4
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
         with:
-          name: test-results-${{ matrix.python-version }}
-          path: junit/test-results-${{ matrix.python-version }}.xml
-        if: ${{ always() }}
+          fail_ci_if_error: false
+          files: ./coverage.xml
+          flags: unittests
 
   build:
     needs: test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            cibw_platforms: "linux_x86_64 linux_aarch64"
-          - os: macos-latest
-            cibw_platforms: "macosx_x86_64 macosx_arm64"
-          - os: windows-latest
-            cibw_platforms: "windows_x86_64 windows_arm64"
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-         fetch-depth: 0
+      - uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.10"
           architecture: 'x64'
           cache: "pip"
 
-      - name: Install build dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install setuptools wheel build twine
+          pip install build twine setuptools-scm
 
-      - name: Inject package version
-        env:
-          RELEASE_VERSION: ${{ inputs.release_version }}
+      - name: Show version from tag
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git tag -a "v$RELEASE_VERSION" -m "Release v$RELEASE_VERSION"
-          git tag -l
+          echo "Release tag: ${{ github.event.release.tag_name }}"
+          python -m setuptools_scm
 
       - name: Build wheels
         run: |
-          python -m build --wheel
-          ls -l dist/
-          python -m build --sdist
-          ls -l dist/
+          python -m build
+          ls -la dist/
 
       - name: Validate build artifacts
         run: |
           twine check dist/*
-          if ! ls dist/ | grep "${{ inputs.release_version }}"; then
-            echo "Error: not find ${PACKAGE_VERSION}！"
-            ls -l dist/
-            exit 1
-          fi
 
-      - name: Upload platform-specific artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}
-          path: dist/*.whl
-
-      - name: Upload source distribution
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: sdist
-          path: dist/*.tar.gz
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all platform wheels
-        uses: actions/download-artifact@v4
-        with:
-          pattern: wheels-*
-          merge-multiple: true
-          path: dist/wheels
-
-      - name: Download source distribution
-        uses: actions/download-artifact@v4
-        with:
-          name: sdist
-          path: dist/sdist
-
-      - name: Merge build artifacts
-        run: |
-          mkdir -p final_dist
-          cp dist/wheels/*.whl final_dist/
-          cp dist/sdist/*.tar.gz final_dist/
-          ls -l final_dist/
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ inputs.release_version }}
-          body: ${{ inputs.release_description }}
-          files: final_dist/*
-          draft: false
-          prerelease: ${{ contains(inputs.release_version, 'beta') || contains(inputs.release_version, 'rc') }}
-          fail_on_unmatched_files: true
+          name: python-packages
+          path: dist/
