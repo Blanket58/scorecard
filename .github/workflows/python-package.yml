@@ -54,6 +54,10 @@ jobs:
           pip install -r requirements.txt pytest pytest-cov
           pip install -e .
 
+      - name: Install libomp on macOS (for lightgbm)
+        if: runner.os == 'macOS'
+        run: brew install libomp
+
       - name: Run tests
         run: |
           pytest tests/ --cov=com --cov-report=xml --cov-report=term-missing
