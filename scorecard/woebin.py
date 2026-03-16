@@ -190,20 +190,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
             - bins_df["neg"] / bins_df["neg"].sum()
         ) * bins_df["woe"]
         bins_df["total_iv"] = bins_df["bin_iv"].sum()
-        bins_df = bins_df[
-            [
-                "variable",
-                "bin",
-                "count",
-                "count_distr",
-                "neg",
-                "pos",
-                "posprob",
-                "woe",
-                "bin_iv",
-                "total_iv",
-            ]
-        ]
+        bins_df = bins_df[["variable", "bin", "count", "count_distr", "neg", "pos", "posprob", "woe", "bin_iv", "total_iv"]]  # fmt: skip
         return bins_df
 
     def plot_bins(self):
