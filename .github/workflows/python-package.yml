@@ -14,7 +14,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.14"
           cache: "pip"
 
       - name: Install lint dependencies
@@ -28,7 +28,7 @@ jobs:
 
       - name: Format check
         run: |
-          black --check .
+          black --check . --target-version to py310
 
   test:
     needs: lint
