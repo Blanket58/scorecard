@@ -111,7 +111,7 @@ def card2sql(card, to_clipboard=True):
             else {{ dt.iloc[-1, 2] }}
         {% endif %}
         end
-        """
+        """  # noqa
         return env.from_string(templ).render(dt=dt)
 
     card["bin"] = card["bin"].astype(str)
