@@ -190,7 +190,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
             - bins_df["neg"] / bins_df["neg"].sum()
         ) * bins_df["woe"]
         bins_df["total_iv"] = bins_df["bin_iv"].sum()
-        bins_df = bins_df[["variable", "bin", "count", "count_distr", "neg", "pos", "posprob", "woe", "bin_iv", "total_iv"]]  # fmt: skip
+        bins_df = bins_df[["variable", "bin", "count", "count_distr", "neg", "pos", "posprob", "woe", "bin_iv", "total_iv"]]  # fmt: skip # noqa
         return bins_df
 
     def plot_bins(self):
@@ -317,7 +317,7 @@ class ChiMergeWoeEncoder(BaseWoeEncoder):
         new_matrix = np.zeros((freq_matrix.shape[0] - 1, 2), dtype=np.float64)
         new_matrix[:min_idx] = freq_matrix[:min_idx]
         new_matrix[min_idx] = merged_row
-        new_matrix[min_idx + 1 :] = freq_matrix[min_idx + 2 :]
+        new_matrix[min_idx + 1:] = freq_matrix[min_idx + 2:]  # fmt: skip
         return new_matrix
 
     def _fit_category(self, x_col, y):
