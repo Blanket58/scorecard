@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from lightgbm import LGBMClassifier
 from matplotlib import pyplot as plt
-from numba import njit, prange
+from numba import njit, prange, set_num_threads
 from scipy.stats import chi2
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.tree import DecisionTreeClassifier
@@ -291,7 +291,11 @@ class DecisionTreeWoeEncoder(BaseWoeEncoder):
 
 class ChiMergeWoeEncoder(BaseWoeEncoder):
 
-    _THRESHOLD = chi2.ppf(q=0.95, df=1)
+    def __init__(self, *, n_jobs=2, **kwargs):
+        super().__init__(**kwargs)
+        self._threshold = chi2.ppf(q=0.95, df=1)
+        self.n_jobs = n_jobs
+        set_num_threads(n_jobs)
 
     @staticmethod
     @njit(fastmath=True, parallel=True)
@@ -329,7 +333,7 @@ class ChiMergeWoeEncoder(BaseWoeEncoder):
             chi2_vals = self._calc_chi2(window)
             min_idx = np.argmin(chi2_vals)
             min_chi2 = chi2_vals[min_idx]
-            if min_chi2 >= self._THRESHOLD:
+            if min_chi2 >= self._threshold:
                 break
             freq_matrix = self._merge_bins(freq_matrix, min_idx)
             merged_interval = boundary[min_idx] + boundary[min_idx + 1]
