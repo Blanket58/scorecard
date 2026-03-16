@@ -203,7 +203,7 @@ def gains_table(label, score, bin_num=10, precision=0):
         dt["cum_neg"] = dt["neg"].cumsum()
         dt["cum_pos"] = dt["pos"].cumsum()
         dt["lift"] = dt["posprob"] / (dt["pos"].sum() / dt["count"].sum())
-        result.append(dt[["dataset", "bin", "count", "count_distr", "neg", "pos", "cum_neg", "cum_pos", "posprob", "lift"]])  # fmt: skip
+        result.append(dt[["dataset", "bin", "count", "count_distr", "neg", "pos", "cum_neg", "cum_pos", "posprob", "lift"]])  # fmt: skip # noqa
     return pd.concat(result, axis=0, ignore_index=True)
 
 
