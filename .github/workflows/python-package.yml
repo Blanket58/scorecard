@@ -28,7 +28,7 @@ jobs:
 
       - name: Format check
         run: |
-          black --check . --target-version to py311
+          black --check . --target-version py311
 
   test:
     needs: lint
