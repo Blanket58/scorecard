@@ -20,7 +20,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         Parameters
         ----------
         bins_num: int, default=8
-            The number of bins you want the varibale been cut into.
+            The number of bins you want the variable been cut into.
         random_state: int, default=1
             Controls the random seed.
         n_jobs: int, default=1
@@ -139,7 +139,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
             fit_strategy, calc_strategy = self._type_strategies[var_type]
         except KeyError:
             raise NotImplementedError(
-                f"Unsupported varibale type: {x_col.name}->{var_type}"
+                f"Unsupported variable type: {x_col.name}->{var_type}"
             )
         boundary = fit_strategy(x_col, y)
         bins_df = calc_strategy(x_col, y, boundary)
