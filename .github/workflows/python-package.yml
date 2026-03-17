@@ -28,7 +28,7 @@ jobs:
 
       - name: Format check
         run: |
-          black --check . --target-version py311
+          black --check . --target-version py311 --verbose --diff
 
   test:
     needs: lint
