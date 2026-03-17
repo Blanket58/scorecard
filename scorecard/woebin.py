@@ -15,7 +15,7 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 
 class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
 
-    def __init__(self, bins_num=8, random_state=1, n_jobs=2):
+    def __init__(self, bins_num=8, random_state=1, n_jobs=1):
         """
         Parameters
         ----------
