@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 from lightgbm import LGBMClassifier
 from matplotlib import pyplot as plt
 from numba import njit, prange, set_num_threads
@@ -14,7 +15,7 @@ from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
 
 class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
 
-    def __init__(self, bins_num=8, random_state=1):
+    def __init__(self, bins_num=8, random_state=1, n_jobs=2):
         """
         Parameters
         ----------
@@ -22,10 +23,14 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
             The number of bins you want the varibale been cut into.
         random_state: int, default=1
             Controls the random seed.
+        n_jobs: int, default=1
+            Number of CPU cores to use for parallel processing.
+            Modify this value only if the number of input variables is extremely large.
         """
         assert bins_num >= 2, "Argument bins_num must >= 2."
         self.bins_num = bins_num
         self.random_state = random_state
+        self.n_jobs = n_jobs
 
         self.boundaries_ = {}
         self.bins_result_ = {}
@@ -128,6 +133,18 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         else:
             return x_col.dtype.name
 
+    def _fit(self, x_col, y):
+        var_type = self._infer_feature_type(x_col)
+        try:
+            fit_strategy, calc_strategy = self._type_strategies[var_type]
+        except KeyError:
+            raise NotImplementedError(
+                f"Unsupported varibale type: {x_col.name}->{var_type}"
+            )
+        boundary = fit_strategy(x_col, y)
+        bins_df = calc_strategy(x_col, y, boundary)
+        return x_col.name, var_type, boundary, bins_df
+
     def fit(self, X, y):
         """Build a woe encoder from the training set (X, y).
 
@@ -146,20 +163,13 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         X, y = self._validate_fit_input(X, y)
         self.feature_names_in_ = X.columns.tolist()
         self.n_features_in_ = X.shape[1]
-        for col in self.feature_names_in_:
-            x_col = X[col]
-            var_type = self._infer_feature_type(x_col)
-            try:
-                fit_strategy, transform_strategy = self._type_strategies[var_type]
-            except KeyError:
-                raise NotImplementedError(
-                    f"Unsupported varibale type: {col}->{var_type}"
-                )
-            boundary = fit_strategy(x_col, y)
-            bins_df = transform_strategy(x_col, y, boundary)
+        results = Parallel(n_jobs=self.n_jobs, verbose=0, prefer="processes")(
+            delayed(self._fit)(X[col], y) for col in self.feature_names_in_
+        )
+        for col, var_type, boundary, bins_df in results:
+            self.feature_types_[col] = var_type
             self.boundaries_[col] = boundary
             self.bins_result_[col] = bins_df
-            self.feature_types_[col] = var_type
         return self
 
     def transform(self, X):
@@ -494,11 +504,18 @@ class DecisionTreeWoeEncoder(BaseWoeEncoder):
 
 class ChiMergeWoeEncoder(BaseWoeEncoder):
 
-    def __init__(self, *, n_jobs=2, **kwargs):
+    def __init__(self, *, n_threads=1, **kwargs):
+        """
+        Parameters
+        ----------
+        n_threads: int, default=1
+            Number of threads to use for numba-accelerated operations.
+            Modify this value only if input data contains variables with an extremely large number of unique values.
+        """
         super().__init__(**kwargs)
         self._threshold = chi2.ppf(q=0.95, df=1)
-        self.n_jobs = n_jobs
-        set_num_threads(n_jobs)
+        self.n_threads = n_threads
+        set_num_threads(n_threads)
 
     @staticmethod
     @njit(fastmath=True, parallel=True)
