@@ -10,7 +10,7 @@ from scipy.stats import chi2
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils.multiclass import type_of_target
-from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
+from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 
 
 class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
@@ -397,8 +397,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         ax1.bar_label(
             bar,
             labels=[
-                f"{row.count_distr:.1%}, {row.count}"
-                for row in bins_df.itertuples()
+                f"{row.count_distr:.1%}, {row.count}" for row in bins_df.itertuples()
             ],
         )
         ax1.set_ylabel("Count distribution")
@@ -450,7 +449,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
             try:
                 bins_df = self.bins_result_[feature_name]
             except KeyError:
-                raise f'Variable {feature_name} never been fitted.'
+                raise f"Variable {feature_name} never been fitted."
             self._plot(feature_name, bins_df)
         else:
             for name, bins_df in self.bins_result_.items():
