@@ -76,7 +76,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         X, y = check_X_y(
             X, y, accept_sparse=False, ensure_all_finite="allow-nan", y_numeric=True
         )
-        assert set(np.unique(y)) == {0, 1}, 'y must contain only 0 and 1.'
+        assert set(np.unique(y)) == {0, 1}, "y must contain only 0 and 1."
         if not feature_names:
             feature_names = [f"feat_{i}" for i in range(X.shape[1])]
         X = pd.DataFrame(X, columns=feature_names).fillna(np.nan)
