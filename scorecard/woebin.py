@@ -545,8 +545,7 @@ class ChiMergeWoeEncoder(BaseWoeEncoder):
         new_matrix[min_idx + 1:] = freq_matrix[min_idx + 2:]  # fmt: skip
         return new_matrix
 
-    def _fit_category(self, x_col, y):
-        freq_matrix = pd.crosstab(x_col, y, dropna=False)
+    def _fit_boundary(self, freq_matrix):
         boundary = [(x,) for x in freq_matrix.index]
         freq_matrix = freq_matrix.values.astype(np.float64)
         while freq_matrix.shape[0] > self.bins_num:
@@ -562,6 +561,15 @@ class ChiMergeWoeEncoder(BaseWoeEncoder):
             boundary[min_idx] = merged_interval
         return boundary
 
+    def _fit_category(self, x_col, y):
+        freq_matrix = (
+            pd.crosstab(x_col, y, dropna=False)
+            .assign(bad_rate=lambda x: x[1] / x.sum(axis=1))
+            .sort_values("bad_rate", ascending=True)
+            .drop(columns="bad_rate")
+        )
+        return self._fit_boundary(freq_matrix)
+
     def _fit_numeric(self, x_col, y):
         try:
             x_col = pd.qcut(
@@ -569,7 +577,8 @@ class ChiMergeWoeEncoder(BaseWoeEncoder):
             )
         except ValueError:
             return [-np.inf, np.inf]
-        raw_interval_groups = self._fit_category(x_col, y)
+        freq_matrix = pd.crosstab(x_col, y, dropna=False)
+        raw_interval_groups = self._fit_boundary(freq_matrix)
         boundary = []
         for interval_group in raw_interval_groups:
             valid_intervals = []
