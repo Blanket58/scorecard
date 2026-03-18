@@ -384,7 +384,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
     def _plot(name, bins_df):
         plt.rcParams["font.sans-serif"] = "Arial Unicode MS"
         fig, ax1 = plt.subplots(figsize=(8, 4))
-        xaxis = bins_df["bin"].astype(str).fillna('nan')
+        xaxis = bins_df["bin"].astype(str).fillna("nan")
         if xaxis.map(lambda x: len(x) > 35).any():
             xaxis = [f"Group {x}" for x in range(xaxis.size)]
         ax1.bar(xaxis, bins_df["neg"], color="#56BCC2", label="neg")
