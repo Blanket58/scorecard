@@ -1,3 +1,5 @@
+import platform
+import warnings
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -5,6 +7,7 @@ import pandas as pd
 from joblib import Parallel, delayed
 from lightgbm import LGBMClassifier
 from matplotlib import pyplot as plt
+from matplotlib.font_manager import fontManager
 from numba import njit, prange, set_num_threads
 from scipy.stats import chi2
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -382,7 +385,6 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
 
     @staticmethod
     def _plot(name, bins_df):
-        plt.rcParams["font.sans-serif"] = "Arial Unicode MS"
         fig, ax1 = plt.subplots(figsize=(8, 4))
         xaxis = bins_df["bin"].astype(str).fillna("nan")
         if xaxis.map(lambda x: len(x) > 35).any():
@@ -446,6 +448,26 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         KeyError
             If the specified `feature_name` was never fitted.
         """
+        system = platform.system()
+        candidates_font = {
+            "Windows": ["Microsoft YaHei", "SimSun", "SimHei"],
+            "Darwin": ["PingFang SC", "Hiragino Sans GB"],
+            "Linux": ["WenQuanYi Micro Hei", "WenQuanYi Zen Hei"],
+        }
+        available_fonts = [x.name for x in fontManager.ttflist]
+        selected_font = None
+        for font in candidates_font.get(system, []):
+            if font in available_fonts:
+                selected_font = font
+                break
+        if selected_font:
+            plt.rcParams["font.sans-serif"] = selected_font
+        else:
+            warnings.warn(
+                "Font not found. Chinese characters will be displayed as garbled text.",
+                UserWarning,
+                stacklevel=2,
+            )
         if feature_name:
             try:
                 bins_df = self.bins_result_[feature_name]
