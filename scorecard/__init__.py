@@ -15,10 +15,8 @@ Main functions:
 ---------------
 
   - scorecard.woebin
-    Auto woe using different algorithms, such as decision tree, chisquare, bestks, etc.
+    Auto woe using two different algorithms: decision tree and chi-merge.
     Observing woe plot after binning, judging if the result is comfortable from businesss perspective.
-
-  - scorecard.iv
     Extract information value table from binning result.
 
   - scorecard.perf
@@ -31,6 +29,5 @@ Main functions:
 """
 
 from .card import card2sql, prob2score, scorecard
-from .iv import iv_table
 from .perf import gains_table, perf_eva, perf_psi
 from .woebin import ChiMergeWoeEncoder, DecisionTreeWoeEncoder
