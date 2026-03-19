@@ -35,12 +35,6 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         self.random_state = random_state
         self.n_jobs = n_jobs
 
-        self.boundaries_ = {}
-        self.bins_result_ = {}
-        self.feature_types_ = {}
-        self.feature_names_in_ = None
-        self.n_features_in_ = None
-
         self._type_strategies = {
             "ENUM": (self._fit_enum, self._calc_enum),
             "CATEGORY": (self._fit_category, self._calc_enum),
@@ -170,6 +164,9 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         results = Parallel(n_jobs=self.n_jobs, verbose=0, prefer="processes")(
             delayed(self._fit)(X[col], y) for col in self.feature_names_in_
         )
+        self.feature_types_ = {}
+        self.boundaries_ = {}
+        self.bins_result_ = {}
         for col, var_type, boundary, bins_df in results:
             self.feature_types_[col] = var_type
             self.boundaries_[col] = boundary
@@ -189,9 +186,9 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         X_transformed: Dataframe
             The transformed X.
         """
-        check_is_fitted(self, ["boundaries_", "bins_result_"])
+        check_is_fitted(self, ["feature_names_in_", "feature_types_", "bins_result_"])
         X = self._validate_transform_input(X)
-        cols = set(X.columns).intersection(self.boundaries_.keys())
+        cols = set(X.columns).intersection(self.feature_names_in_)
         results = []
         for col in cols:
             x_col = X[col]
@@ -448,6 +445,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         KeyError
             If the specified `feature_name` was never fitted.
         """
+        check_is_fitted(self, "bins_result_")
         system = platform.system()
         candidates_font = {
             "Windows": ["Microsoft YaHei", "SimSun", "SimHei"],
@@ -477,6 +475,35 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         else:
             for name, bins_df in self.bins_result_.items():
                 self._plot(name, bins_df)
+
+    def iv_table(self):
+        """Generate a table of Information Value (IV) for each variable.
+
+        This method returns a DataFrame containing the IV for each variable,
+        sorted in descending order by the total IV. The DataFrame includes
+        two columns: 'variable' and 'total_iv', representing the variable name
+        and its corresponding Information Value, respectively. The method
+        ensures that the binning process has been completed before generating
+        the table.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with two columns: 'variable' and 'total_iv', sorted
+            in descending order by 'total_iv'.
+
+        Raises
+        ------
+        NotFittedError
+            If the binning process has not been completed.
+        """
+        check_is_fitted(self, "bins_result_")
+        dt = pd.concat(self.bins_result_.values(), axis=0)
+        return (
+            dt[["variable", "total_iv"]]
+            .drop_duplicates()
+            .sort_values(by="total_iv", ascending=False, ignore_index=True)
+        )
 
 
 class DecisionTreeWoeEncoder(BaseWoeEncoder):
