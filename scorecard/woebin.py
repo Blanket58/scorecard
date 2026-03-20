@@ -382,7 +382,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
 
     @staticmethod
     def _plot(name, bins_df):
-        fig, ax1 = plt.subplots(figsize=(8, 4))
+        fig, ax1 = plt.subplots(figsize=(10, 6))
         xaxis = bins_df["bin"].astype(str).fillna("nan")
         if xaxis.map(lambda x: len(x) > 35).any():
             xaxis = [f"Group {x}" for x in range(xaxis.size)]
@@ -476,6 +476,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
             for name, bins_df in self.bins_result_.items():
                 self._plot(name, bins_df)
 
+    @property
     def iv_table(self):
         """Generate a table of Information Value (IV) for each variable.
 
