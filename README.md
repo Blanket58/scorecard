@@ -2,163 +2,89 @@
 
 [![Python package](https://github.com/Blanket58/scorecard/actions/workflows/python-package.yml/badge.svg)](https://github.com/Blanket58/scorecard/actions/workflows/python-package.yml)
 
-Rewrite brand new robust scorecard toolbox, if you are looking for something similar as `scorecard` in R and `scorecardpy` in python.
+A robust, sklearn-style scorecard toolbox for credit risk modeling. A Python alternative to R's `scorecard` package, providing end-to-end functionality from binning and WOE encoding to scorecard generation, SQL deployment, and model performance evaluation.
 
-## User Guide
 
-Download from releases and install it.
+## Key Features
+
+- **Smart Binning**: Supports both ChiMerge and Decision Tree-based binning methods.
+- **WOE Encoding**: Automatic Weight of Evidence (WOE) transformation for categorical and continuous features.
+- **IV Calculation**: Computes Information Value (IV) for data-driven feature selection.
+- **Scorecard Generation**: Creates interpretable scorecards with point values for each feature bin.
+- **SQL Conversion**: Converts scorecards to executable SQL CASE WHEN statements for production deployment.
+- **Performance Evaluation**: Includes KS, AUC, PSI (Population Stability Index), gains table, and lift analysis.
+- **Sklearn Compatible**: Follows sklearn API conventions for seamless integration with existing machine learning workflows.
+
+
+## Installation
+
+Download the latest wheel file from [Releases](https://github.com/Blanket58/scorecard/releases) and install via pip:
 
 ```bash
-pip install scorecard-0.0.1-py3-none-any.whl
+pip install scorecard-0.0.8-py3-none-any.whl
 ```
 
-Using germancredit dataset as example.
+(Note: Replace the wheel filename with the latest version from Releases.)
+
+
+## Quick Start
+
+Here's a minimal end-to-end example:
 
 ```python
-import json
+import numpy as np
 import pandas as pd
-import plotly.express as px
-from sklearn.linear_model import LogisticRegressionCV
-from sklearn.model_selection import train_test_split
-from statsmodels.stats.outliers_influence import variance_inflation_factor
-from scorecard import gains_table, iv_table, perf_eva, perf_psi, prob2score, woebin, woebin_plot, woebin_ply, scorecard, card2sql
-```
-
-```python
-import ssl
 from ucimlrepo import fetch_ucirepo
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegressionCV
 
-ssl._create_default_https_context = ssl._create_unverified_context
+from scorecard import (
+    ChiMergeWoeEncoder,
+    scorecard,
+    card2sql,
+    perf_eva,
+    perf_psi
+)
+
+# 1. Load sample data (German Credit Data)
 statlog_german_credit_data = fetch_ucirepo(id=144)
 X = statlog_german_credit_data.data.features
-y = statlog_german_credit_data.data.targets.squeeze().map({1:0, 2:1})
-```
+y = statlog_german_credit_data.data.targets.squeeze().map({1: 0, 2: 1})
 
-```python
-print(json.dumps(statlog_german_credit_data.metadata, ensure_ascii=False, indent=4))
-```
+# 2. WOE encoding with ChiMerge binning
+woe_encoder = ChiMergeWoeEncoder()
+X_woe = woe_encoder.fit_transform(X, y)
 
-```python
-statlog_german_credit_data.variables
-```
-
-```python
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=1, stratify=y)
-print('train', y_train.value_counts())
-print('test', y_test.value_counts())
-```
-
-```python
-bins = woebin(X_train, y_train)
-```
-
-```python
-iv = iv_table(bins)
-iv
-```
-
-```python
+# 3. Feature selection (IV >= 0.02)
+iv = woe_encoder.iv_table
 variables = iv.loc[iv['total_iv'] >= 0.02, 'variable'].tolist()
-bins = dict(filter(lambda x: x[0] in variables, bins.items()))
-```
+bins = dict(filter(lambda x: x[0] in variables, woe_encoder.bins_result_.items()))
 
-```python
-woebin_plot(bins)
-```
+# 4. Train-test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X_woe[variables], y, test_size=0.25, random_state=1, stratify=y
+)
 
-![Figure_1](https://github.com/user-attachments/assets/4b456537-3fca-4a3b-bd79-3b427b9a6b70)
-
-```python
-X_train_woe = woebin_ply(X_train[variables], bins)
-X_test_woe = woebin_ply(X_test[variables], bins)
-```
-
-```python
-corr = X_train_woe.corr()
-fig = px.imshow(corr, aspect='auto', width=800, height=600)
-fig.show()
-```
-
-```python
+# 5. Train logistic regression model
 clf = LogisticRegressionCV(
-    Cs=10,
-    fit_intercept=True,
-    cv=5,
-    penalty='l1',
-    solver='liblinear',
-    random_state=1
+    Cs=10, fit_intercept=True, cv=5, l1_ratios=(1,),
+    solver='liblinear', random_state=1
 )
-clf.fit(X_train_woe, y_train)
-```
+clf.fit(X_train, y_train)
 
-```python
-vif = pd.DataFrame()
-vif['variable'] = variables
-vif['coefficients'] = clf.coef_.reshape(-1,)
-vif['vif'] = [variance_inflation_factor(X_train_woe, i) for i in range(len(variables))]
-vif.sort_values('vif', ascending=False)
-```
-
-```python
-y_train_pred = clf.predict_proba(X_train_woe)[:, 1]
-y_test_pred = clf.predict_proba(X_test_woe)[:, 1]
-```
-
-```python
-perf_eva(y_train, y_train_pred, 'Train')
-perf_eva(y_test, y_test_pred, 'Test')
-```
-
-![Figure_2](https://github.com/user-attachments/assets/696907b0-ea07-40a0-8c85-6045c783d39a)
-![Figure_3](https://github.com/user-attachments/assets/263bc8bc-03a6-4e9e-a563-ea100055d386)
-
-```python
-total_bad_rate = y_train.sum() / y_train.size
-odds0 = total_bad_rate / (1 - total_bad_rate)
-y_train_score = prob2score(
-    y_train_pred,
-    points0=600,
-    odds0=odds0,
-    pdo=50
-)
-y_test_score = prob2score(
-    y_test_pred,
-    points0=600,
-    odds0=odds0,
-    pdo=50
-)
-```
-
-```python
-gains_table(
-    label={'train': y_train, 'test': y_test},
-    score={'train': y_train_score, 'test': y_test_score},
-    bin_num=10
-)
-```
-
-```python
-perf_psi(
-    label={'train': y_train, 'test': y_test},
-    score={'train': y_train_score, 'test': y_test_score}
-)
-```
-
-![Figure_4](https://github.com/user-attachments/assets/10704262-a693-48aa-8563-79e28cbba903)
-
-```python
+# 6. Generate scorecard
 card = scorecard(
-    bins,
-    clf.intercept_,
-    clf.coef_.reshape(-1,),
-    variables,
-    points0=600,
-    odds0=odds0,
-    pdo=50
+    bins, clf.intercept_, clf.coef_.reshape(-1,), variables,
+    points0=600, odds0=y_train.sum()/(y_train.size - y_train.sum()), pdo=50
 )
-card
+
+# 7. Convert scorecard to SQL
+sql = card2sql(card, to_clipboard=False)
+print(sql)
 ```
 
-```python
-print(card2sql(card))
-```
+
+## Full Example
+
+See the complete end-to-end workflow (including performance evaluation, PSI analysis, and visualization) on nbviewer:  
+[📓 Example Notebook](https://nbviewer.org/github/Blanket58/scorecard/blob/main/examples/example.ipynb)
