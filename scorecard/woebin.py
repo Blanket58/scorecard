@@ -15,6 +15,8 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils.multiclass import type_of_target
 from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 
+from .constant import EPS
+
 
 class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
 
@@ -40,7 +42,6 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
             "CATEGORY": (self._fit_category, self._calc_enum),
             "NUMERIC": (self._fit_numeric, self._calc_numeric),
         }
-        self._EPS = np.finfo(np.float64).eps
 
     @staticmethod
     def _validate_fit_input(X, y):
@@ -359,7 +360,8 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         bins_df = self._calc_bins_df(df)
         return bins_df
 
-    def _calc_bins_df(self, df):
+    @staticmethod
+    def _calc_bins_df(df):
         bins_df = (
             df.groupby(["variable", "bin"], observed=True, dropna=False)
             .agg(count=("y", "count"), pos=("y", "sum"))
@@ -369,8 +371,8 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         bins_df["neg"] = bins_df["count"] - bins_df["pos"]
         bins_df["posprob"] = bins_df["pos"] / bins_df["count"]
         bins_df["woe"] = np.log(
-            (bins_df["pos"].replace(0, self._EPS) / bins_df["pos"].sum())
-            / (bins_df["neg"].replace(0, self._EPS) / bins_df["neg"].sum())
+            (bins_df["pos"].replace(0, EPS) / bins_df["pos"].sum())
+            / (bins_df["neg"].replace(0, EPS) / bins_df["neg"].sum())
         )
         bins_df["bin_iv"] = (
             bins_df["pos"] / bins_df["pos"].sum()
@@ -581,7 +583,7 @@ class ChiMergeWoeEncoder(BaseWoeEncoder):
             if grand_total == 0:
                 continue
             expected = np.outer(row_totals, col_totals) / grand_total
-            expected = np.where(expected == 0, np.finfo(np.float64).eps, expected)
+            expected = np.where(expected == 0, EPS, expected)
             chi2_vals[i] = np.sum((pair - expected) ** 2 / expected)
         return chi2_vals
 
