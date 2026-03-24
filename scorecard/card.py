@@ -149,4 +149,3 @@ def card2sql(card, to_clipboard=True):
     if to_clipboard:
         pyperclip.copy(result)
     return result
-
