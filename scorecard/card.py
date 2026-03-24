@@ -81,40 +81,68 @@ def card2sql(card, to_clipboard=True):
     """
 
     def parse(dt):
-        def search(value):
-            return re.search(r"\bnan\b", value)
+        def is_tuple(value):
+            return isinstance(value, tuple)
 
-        def sub(value):
-            return re.sub(r"( ,)?nan(, )?", "", value)
+        def is_interval(value):
+            return isinstance(value, pd.Interval)
+
+        def has_nan(value):
+            if not isinstance(value, tuple):
+                return False
+            return np.nan in value
+
+        def filter_nan(value):
+            return tuple(filter(lambda x: x == x, value))
+
+        def is_infinite(value):
+            return not np.isfinite(value)
+
+        def format_tuple(value):
+            res = []
+            for x in value:
+                if isinstance(x, str):
+                    res.append(f"'{x}'")
+                elif isinstance(x, np.number):
+                    res.append(str(x.item()))
+                else:
+                    res.append(str(x))
+            return res
 
         env = Environment(autoescape=False, trim_blocks=True, lstrip_blocks=True)
-        env.filters["search"] = search
-        env.filters["sub"] = sub
+        env.filters["is_tuple"] = is_tuple
+        env.filters["is_interval"] = is_interval
+        env.filters["has_nan"] = has_nan
+        env.filters["filter_nan"] = filter_nan
+        env.filters["is_infinite"] = is_infinite
+        env.filters["format_tuple"] = format_tuple
         templ = """
         case
         {% for row in dt.itertuples() %}
-        {% if row.bin.startswith('[') %}
-        {% if row.bin.endswith('inf)') %}
+            {% if row.bin | is_tuple %}
+                {% if row.bin | has_nan %}
+                    {% if len(row.bin) == 1 %}
+            when {{ row.variable }} is null then {{ row.score }}
+                    {% else %}
+            when {{ row.variable }} is null or {{ row.variable }} in ({{ row.bin | filter_nan | format_tuple | join(',') }}) then {{ row.score }}
+                    {% endif %}
+                {% else %}
+            when {{ row.variable }} in ({{ row.bin | format_tuple | join(',') }}) then {{ row.score }}
+                {% endif %}
+            {% elif row.bin | is_interval %}
+                {% if row.bin.right | is_infinite %}
             else {{ row.score }}
-        {% else %}
-            when {{ row.variable }} < {{ row.bin.strip(')').split(',')[1] }} then {{ row.score }}
-        {% endif %}
-        {% else %}
-        {% if row.bin | search %}
-            when {{ row.variable }} is null or {{ row.variable }} in {{ row.bin | sub | replace(',)', ')') }} then {{ row.score }}
-        {% else %}
-            when {{ row.variable }} in {{ row.bin | replace(',)', ')') }} then {{ row.score }}
-        {% endif %}
-        {% endif %}
+                {% else %}
+            when {{ row.variable }} <= {{ row.bin.right }} then {{ row.score }}
+                {% endif %}
+            {% else %}
+            else {{ row.score }}
+            {% endif %}
         {% endfor %}
-        {% if dt.iloc[-1, 1].startswith('(') %}
-            else {{ dt.iloc[-1, 2] }}
-        {% endif %}
         end
         """  # noqa
-        return env.from_string(templ).render(dt=dt)
+        return env.from_string(templ).render({"dt": dt})
 
-    card["bin"] = card["bin"].astype(str)
     variables = card.iloc[1:, 0].unique()
     result = [str(card.iloc[0, 2])]
     for variable in variables:
@@ -123,3 +151,4 @@ def card2sql(card, to_clipboard=True):
     if to_clipboard:
         pyperclip.copy(result)
     return result
+
