@@ -9,6 +9,8 @@ from sklearn.metrics import (
     roc_curve,
 )
 
+from .constant import EPS
+
 
 def perf_eva(y_true, y_proba, title=None):
     """
@@ -267,10 +269,7 @@ def perf_psi(label, score):
 
     psi = (
         (dt_actual["count_distr"] - dt_expected["count_distr"])
-        * np.log(
-            dt_actual["count_distr"].map(lambda x: 0.00000001 if x == 0 else x)
-            / dt_expected["count_distr"]
-        )
+        * np.log(dt_actual["count_distr"].replace(0, EPS) / dt_expected["count_distr"])
     ).sum()
 
     fig, ax1 = plt.subplots(figsize=(10, 5))
