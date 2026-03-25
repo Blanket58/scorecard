@@ -32,8 +32,7 @@ pip install scorecard-0.0.8-py3-none-any.whl
 Here's a minimal end-to-end example:
 
 ```python
-import numpy as np
-import pandas as pd
+import ssl
 from ucimlrepo import fetch_ucirepo
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegressionCV
@@ -47,6 +46,7 @@ from scorecard import (
 )
 
 # 1. Load sample data (German Credit Data)
+ssl._create_default_https_context = ssl._create_unverified_context
 statlog_german_credit_data = fetch_ucirepo(id=144)
 X = statlog_german_credit_data.data.features
 y = statlog_german_credit_data.data.targets.squeeze().map({1: 0, 2: 1})
