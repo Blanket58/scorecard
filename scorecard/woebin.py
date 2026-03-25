@@ -403,7 +403,9 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
             ],
         )
         ax1.set_ylabel("Count distribution")
-        ax1.set_title(f"{feature_name} (iv: {bins_df.total_iv.iloc[0]:.4f})", loc="left")
+        ax1.set_title(
+            f"{feature_name} (iv: {bins_df.total_iv.iloc[0]:.4f})", loc="left"
+        )
         ax2 = ax1.twinx()
         ax2.plot(
             xaxis,
