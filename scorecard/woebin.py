@@ -383,8 +383,8 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         return bins_df
 
     @staticmethod
-    def _plot(name, bins_df):
-        fig, ax1 = plt.subplots(figsize=(10, 6))
+    def _plot(feature_name, bins_df, figsize, return_fig):
+        fig, ax1 = plt.subplots(figsize=figsize)
         xaxis = bins_df["bin"].astype(str).fillna("nan")
         if xaxis.map(lambda x: len(x) > 35).any():
             xaxis = [f"Group {x}" for x in range(xaxis.size)]
@@ -403,7 +403,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
             ],
         )
         ax1.set_ylabel("Count distribution")
-        ax1.set_title(f"{name} (iv: {bins_df.total_iv.iloc[0]:.4f})", loc="left")
+        ax1.set_title(f"{feature_name} (iv: {bins_df.total_iv.iloc[0]:.4f})", loc="left")
         ax2 = ax1.twinx()
         ax2.plot(
             xaxis,
@@ -427,10 +427,13 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         ax2.tick_params(axis="y", labelcolor="blue")
         fig.legend(loc="outside lower center", ncol=2, borderaxespad=0)
         fig.tight_layout()
-        plt.show()
-        plt.close(fig)
+        if return_fig:
+            return fig
+        else:
+            plt.show()
+            plt.close(fig)
 
-    def plot(self, feature_name: str = None):
+    def plot(self, feature_name=None, figsize=(10, 6), return_fig=False):
         """Visualize the discretization bins result for one or all features.
 
         Generate woe plots for the pre-calculated discretization bins of a
@@ -473,10 +476,10 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
                 bins_df = self.bins_result_[feature_name]
             except KeyError:
                 raise f"Variable {feature_name} never been fitted."
-            self._plot(feature_name, bins_df)
+            return self._plot(feature_name, bins_df, figsize, return_fig)
         else:
-            for name, bins_df in self.bins_result_.items():
-                self._plot(name, bins_df)
+            for feature_name, bins_df in self.bins_result_.items():
+                self._plot(feature_name, bins_df, figsize, return_fig=False)
 
     @property
     def iv_table(self):
