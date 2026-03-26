@@ -38,9 +38,9 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         self.n_jobs = n_jobs
 
         self._type_strategies = {
-            "ENUM": (self._fit_enum, self._calc_enum),
-            "CATEGORY": (self._fit_category, self._calc_enum),
-            "NUMERIC": (self._fit_numeric, self._calc_numeric),
+            "Enum": (self._fit_enum, self._calc_enum),
+            "Char": (self._fit_char, self._calc_enum),
+            "Number": (self._fit_number, self._calc_number),
         }
 
     @staticmethod
@@ -124,11 +124,11 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         data_type: str
         """
         if x_col.dropna().unique().size <= 3:
-            return "ENUM"
+            return "Enum"
         elif pd.api.types.is_string_dtype(x_col):
-            return "CATEGORY"
+            return "Char"
         elif pd.api.types.is_any_real_numeric_dtype(x_col):
-            return "NUMERIC"
+            return "Number"
         else:
             return x_col.dtype.name
 
@@ -198,12 +198,12 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
             default_value = bins_df.sort_values(
                 by="posprob", ascending=False, ignore_index=True
             ).loc[0, "woe"]
-            if var_type in ["ENUM", "CATEGORY"]:
+            if var_type in ["Enum", "Char"]:
                 mapping = {
                     item: row.woe for row in bins_df.itertuples() for item in row.bin
                 }
                 x_col = x_col.map(mapping).fillna(default_value)
-            elif var_type == "NUMERIC":
+            elif var_type == "Number":
                 x_col = pd.Series(
                     np.select(
                         [
@@ -248,7 +248,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         return boundary
 
     @abstractmethod
-    def _fit_category(self, x_col, y):
+    def _fit_char(self, x_col, y):
         """Determine discretization bins for categorical data.
 
         For string-dtype data with more than 3 unique values, it will be classified as
@@ -271,7 +271,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         pass
 
     @abstractmethod
-    def _fit_numeric(self, x_col, y):
+    def _fit_number(self, x_col, y):
         """Determine discretization bins for numerical data.
 
         For numeric-dtype data, it will be classified as NUMERIC type, the algorithm will
@@ -293,9 +293,9 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         pass
 
     def _calc_enum(self, x_col, y, boundary):
-        return self._calc_category(x_col, y, boundary)
+        return self._calc_char(x_col, y, boundary)
 
-    def _calc_category(self, x_col, y, boundary):
+    def _calc_char(self, x_col, y, boundary):
         """Calculate bin statistics for categorical feature.
 
         Maps each categorical value to its assigned bin group (per pre-defined boundary),
@@ -326,7 +326,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         )
         return bins_df
 
-    def _calc_numeric(self, x_col, y, boundary):
+    def _calc_number(self, x_col, y, boundary):
         """Calculate bin statistics for numerical feature.
 
         Uses pandas.cut to split numeric values into continuous bins (per pre-defined cut points),
@@ -516,7 +516,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
 
 class DecisionTreeWoeEncoder(BaseWoeEncoder):
 
-    def _fit_category(self, x_col, y):
+    def _fit_char(self, x_col, y):
         clf = LGBMClassifier(
             objective="binary",
             importance_type="gain",
@@ -539,7 +539,7 @@ class DecisionTreeWoeEncoder(BaseWoeEncoder):
         )
         return boundary
 
-    def _fit_numeric(self, x_col, y):
+    def _fit_number(self, x_col, y):
         clf = DecisionTreeClassifier(
             criterion="entropy",
             splitter="best",
@@ -618,7 +618,7 @@ class ChiMergeWoeEncoder(BaseWoeEncoder):
             boundary[min_idx] = merged_interval
         return boundary
 
-    def _fit_category(self, x_col, y):
+    def _fit_char(self, x_col, y):
         freq_matrix = (
             pd.crosstab(x_col, y, dropna=False)
             .assign(bad_rate=lambda x: x[1] / x.sum(axis=1))
@@ -627,7 +627,7 @@ class ChiMergeWoeEncoder(BaseWoeEncoder):
         )
         return self._fit_boundary(freq_matrix)
 
-    def _fit_numeric(self, x_col, y):
+    def _fit_number(self, x_col, y):
         try:
             x_col = pd.qcut(
                 x_col, q=min(50, x_col.unique().size), precision=3, duplicates="drop"
