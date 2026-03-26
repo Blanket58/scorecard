@@ -1,11 +1,15 @@
+from itertools import chain
 from typing import List, Tuple, Union
 
+import joblib
 import numpy as np
 import streamlit as st
 from pydantic import BaseModel, field_validator
 
+from scorecard.interactive.interactive import _load_data_raw
 
-class EnumBoundary(BaseModel):
+
+class _EnumBoundary(BaseModel):
     boundary: List[Tuple[Union[str, int, float], ...]]
 
     @field_validator("boundary")
@@ -17,7 +21,7 @@ class EnumBoundary(BaseModel):
                     "Invalid group length: each tuple must have exactly one element."
                 )
 
-        items = [group[0] for group in v]
+        items = list(chain.from_iterable(v))
         for item in items:
             is_valid = (
                 isinstance(item, str)
@@ -53,7 +57,7 @@ class EnumBoundary(BaseModel):
         return converted_items
 
 
-class CharBoundary(BaseModel):
+class _CharBoundary(BaseModel):
     boundary: List[Tuple[Union[str, float], ...]]
 
     @field_validator("boundary")
@@ -68,10 +72,14 @@ class CharBoundary(BaseModel):
                         f"Invalid value: {item} (type: {type(item).__name__}). "
                         "Only str and np.nan are allowed in categorical boundaries."
                     )
+
+        items = list(chain.from_iterable(v))
+        if len(items) != len(set(items)):
+            raise ValueError("Duplicate values not allowed.")
         return v
 
 
-class NumberBoundary(BaseModel):
+class _NumberBoundary(BaseModel):
     boundary: List[Union[int, float]]
 
     @field_validator("boundary")
@@ -88,14 +96,20 @@ class NumberBoundary(BaseModel):
         return converted_items
 
 
-boundary_strategy = {
-    "Enum": EnumBoundary,
-    "Char": CharBoundary,
-    "Number": NumberBoundary,
+_boundary_strategy = {
+    "Enum": _EnumBoundary,
+    "Char": _CharBoundary,
+    "Number": _NumberBoundary,
 }
 
 
-def interactive(self, X, y):
+@st.cache_data
+def _load_data():
+    return _load_data_raw()
+
+
+def main():
+    self, X, y = _load_data()
     st.set_page_config(page_title="Binning Editor", layout="wide")
     st.markdown(
         """
@@ -128,7 +142,7 @@ def interactive(self, X, y):
             )
             if new_boundary:
                 var_type = self.feature_types_[feature_name]
-                validate_strategy = boundary_strategy[var_type]
+                validate_strategy = _boundary_strategy[var_type]
                 _, calc_strategy = self._type_strategies[var_type]
                 try:
                     new_boundary = eval(new_boundary, {"np": np, "__builtins__": {}})
@@ -138,10 +152,11 @@ def interactive(self, X, y):
                     st.session_state.new_bins_df = new_bins_df
                     st.success(f"✅ New boundary: {new_boundary}")
                     st.divider()
-                    save = st.button("Save (Can not be reversed.)")
+                    save = st.button("Save (Can not be reversed.)", on_click=st.cache_data.clear)
                     if save:
                         self.boundaries_[feature_name] = new_boundary
                         self.bins_result_[feature_name] = new_bins_df
+                        joblib.dump((self, X, y), 'model.pkl')
                         st.toast("Save success!")
                 except Exception as e:
                     st.error(str(e))
@@ -169,3 +184,7 @@ def interactive(self, X, y):
                 display_df = st.session_state.new_bins_df
         st.pyplot(fig, clear_figure=True)
         st.dataframe(display_df, hide_index=True)
+
+
+if __name__ == "__main__":
+    main()
