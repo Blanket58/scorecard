@@ -39,7 +39,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
 
         self._type_strategies = {
             "Enum": (self._fit_enum, self._calc_enum),
-            "Char": (self._fit_char, self._calc_enum),
+            "Char": (self._fit_char, self._calc_char),
             "Number": (self._fit_number, self._calc_number),
         }
 
@@ -383,7 +383,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
         return bins_df
 
     @staticmethod
-    def _plot(feature_name, bins_df, figsize, return_fig):
+    def _plot(feature_name, bins_df, *, figsize, return_fig):
         fig, ax1 = plt.subplots(figsize=figsize)
         xaxis = bins_df["bin"].astype(str).fillna("nan")
         if xaxis.map(lambda x: len(x) > 35).any():
@@ -435,7 +435,7 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
             plt.show()
             plt.close(fig)
 
-    def plot(self, feature_name=None, figsize=(10, 6), return_fig=False):
+    def plot(self, feature_name=None, *, figsize=(10, 6), return_fig=False):
         """Visualize the discretization bins result for one or all features.
 
         Generate woe plots for the pre-calculated discretization bins of a
@@ -478,10 +478,10 @@ class BaseWoeEncoder(TransformerMixin, BaseEstimator, ABC):
                 bins_df = self.bins_result_[feature_name]
             except KeyError:
                 raise f"Variable {feature_name} never been fitted."
-            return self._plot(feature_name, bins_df, figsize, return_fig)
+            return self._plot(feature_name, bins_df, figsize=figsize, return_fig=return_fig)
         else:
             for feature_name, bins_df in self.bins_result_.items():
-                self._plot(feature_name, bins_df, figsize, return_fig=False)
+                self._plot(feature_name, bins_df, figsize=figsize, return_fig=False)
 
     @property
     def iv_table(self):
