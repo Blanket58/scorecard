@@ -9,7 +9,105 @@ from sklearn.metrics import (
     roc_curve,
 )
 
-from .constant import EPS
+from .util import EPS
+
+
+def woebin_plot(bins_result, feature_name=None, *, figsize=(10, 6), return_fig=False):
+    """Visualize the discretization bins result for one or all features.
+
+    Generate WOE binning plots for pre-calculated discretization results.
+    Plots a single specified feature, or all features if no name is provided.
+
+    Creates a combined plot for each feature:
+    1. Stacked bar chart for positive/negative sample count distribution.
+    2. Line chart for positive probability on secondary Y-axis.
+
+    Parameters
+    ----------
+    bins_result : dict
+        Dictionary of binning results, keys are feature names, values are
+        corresponding binning DataFrames.
+        DataFrame containing binning results with columns: bin, pos, neg,
+        count_distr, posprob, total_iv.
+    feature_name : str, optional
+        Name of the feature to plot. If None, generate plots for all features.
+    figsize : tuple of (float, float), default (10, 6)
+        Figure size in inches (width, height).
+    return_fig : bool, default False
+        If True, return the matplotlib Figure object; if False, display the plot
+        and close the figure window.
+
+    Returns
+    -------
+    matplotlib.figure.Figure or None
+        Figure object if return_fig=True and feature_name is specified,
+        otherwise None.
+
+    Raises
+    ------
+    KeyError
+        If the specified feature_name does not exist in bins_result.
+    """
+    if feature_name:
+        try:
+            bins_df = bins_result[feature_name]
+        except KeyError:
+            raise f"Variable {feature_name} never been fitted."
+        return _woebin_plot(
+            feature_name, bins_df, figsize=figsize, return_fig=return_fig
+        )
+    else:
+        for feature_name, bins_df in bins_result.items():
+            _woebin_plot(feature_name, bins_df, figsize=figsize, return_fig=False)
+
+
+def _woebin_plot(feature_name, bins_df, *, figsize, return_fig):
+    fig, ax1 = plt.subplots(figsize=figsize)
+    xaxis = bins_df["bin"].astype(str).fillna("nan")
+    if xaxis.map(lambda x: len(x) > 35).any():
+        xaxis = [f"Group {x}" for x in range(xaxis.size)]
+    ax1.bar(xaxis, bins_df["neg"], color="#56BCC2", label="neg")
+    bar = ax1.bar(
+        xaxis,
+        bins_df["pos"],
+        bottom=bins_df["neg"],
+        color="#E77D72",
+        label="pos",
+    )
+    ax1.bar_label(
+        bar,
+        labels=[f"{row.count_distr:.1%}, {row.count}" for row in bins_df.itertuples()],
+    )
+    ax1.set_ylabel("Count distribution")
+    ax1.set_title(f"{feature_name} (iv: {bins_df.total_iv.iloc[0]:.4f})", loc="left")
+    ax2 = ax1.twinx()
+    ax2.plot(
+        xaxis,
+        bins_df["posprob"],
+        color="blue",
+        marker="o",
+        markersize=4,
+        linewidth=1,
+    )
+    for x, y in zip(xaxis, bins_df["posprob"]):
+        ax2.text(
+            x,
+            y,
+            f"{y:.2%}",
+            ha="center",
+            va="bottom",
+            color="blue",
+            fontsize=10,
+        )
+    ax2.set_ylabel("Positive probability", color="blue")
+    ax2.tick_params(axis="y", labelcolor="blue")
+    fig.legend(loc="outside lower center", ncol=2, borderaxespad=0)
+    fig.tight_layout()
+    if return_fig:
+        return fig
+    else:
+        plt.show()
+        plt.close(fig)
 
 
 def perf_eva(y_true, y_proba, title=None):
